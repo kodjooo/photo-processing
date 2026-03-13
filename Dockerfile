@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY app ./app
 COPY tests ./tests
+COPY app/assets ./app/assets
 
 RUN mkdir -p /app/assets
 

@@ -1,7 +1,12 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps, ImageStat
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
+
+try:
+    import rawpy
+except ImportError:  # pragma: no cover
+    rawpy = None
 
 from app.enums import ProcessingPreset
 
@@ -35,13 +40,23 @@ class ImageProcessor:
         left_logo_path: str,
         right_logo_path: str,
     ) -> None:
-        image = Image.open(source_path)
-        image = ImageOps.exif_transpose(image).convert("RGB")
+        image = self.load_source_image(source_path)
         metrics = self.calculate_metrics(image)
         processed = self.apply_pipeline(image, metrics, preset)
         composed = self.apply_logos(processed, left_logo_path, right_logo_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
         composed.save(target_path, quality=95)
+
+    def load_source_image(self, source_path: Path) -> Image.Image:
+        if source_path.suffix.lower() in {".cr2", ".arw"}:
+            if rawpy is None:
+                raise RuntimeError("Поддержка RAW недоступна: не установлена библиотека rawpy")
+            with rawpy.imread(str(source_path)) as raw:
+                rgb = raw.postprocess(use_camera_wb=True, no_auto_bright=False, output_bps=8)
+            return Image.fromarray(rgb).convert("RGB")
+
+        image = Image.open(source_path)
+        return ImageOps.exif_transpose(image).convert("RGB")
 
     def calculate_metrics(self, image: Image.Image) -> ImageMetrics:
         grayscale = image.convert("L")
@@ -112,4 +127,3 @@ class ImageProcessor:
         alpha = image.getchannel("A")
         adjusted = alpha.point(lambda value: int(value * opacity))
         return Image.merge("RGBA", (*image.convert("RGB").split(), adjusted))
-

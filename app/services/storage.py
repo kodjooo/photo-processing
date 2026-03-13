@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app.config import get_settings
 
-SUPPORTED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+SUPPORTED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".cr2", ".arw"}
 
 
 @dataclass(slots=True)
@@ -98,4 +98,3 @@ class StorageService:
 
     def cleanup(self, job_root: Path) -> None:
         shutil.rmtree(job_root, ignore_errors=True)
-
