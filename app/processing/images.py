@@ -26,7 +26,8 @@ class ImageProcessor:
         if not path.exists():
             return Image.new("RGBA", (1, 1), (255, 255, 255, 0))
         logo = Image.open(path).convert("RGBA")
-        target_width = max(80, int(base_width * 0.12))
+        width_ratio = 0.15 if base_width > base_height else 0.25
+        target_width = max(80, int(base_width * width_ratio))
         ratio = target_width / max(1, logo.width)
         target_height = max(1, int(logo.height * ratio))
         return logo.resize((target_width, target_height))
@@ -97,12 +98,26 @@ class ImageProcessor:
         if metrics.sharpness < 0.08:
             sharpness_factor += 0.08
 
-        if preset == ProcessingPreset.SOFT:
-            contrast_factor -= 0.04
-            color_factor -= 0.01
-        if preset == ProcessingPreset.CONTRAST:
-            contrast_factor += 0.10
-            sharpness_factor += 0.05
+        if preset == ProcessingPreset.DEFAULT:
+            preset = ProcessingPreset.BALANCED
+
+        if preset == ProcessingPreset.NATURAL:
+            brightness_factor -= 0.01 if metrics.bright_ratio > 0.12 else 0.0
+            contrast_factor -= 0.02
+            color_factor = 1.01
+            sharpness_factor -= 0.01
+        elif preset == ProcessingPreset.BALANCED:
+            if metrics.dark_ratio > 0.20:
+                brightness_factor += 0.03
+            contrast_factor += 0.04
+            color_factor = 1.06
+            sharpness_factor += 0.04
+        elif preset == ProcessingPreset.STRONG:
+            if metrics.dark_ratio > 0.20:
+                brightness_factor += 0.05
+            contrast_factor += 0.12
+            color_factor = 1.10
+            sharpness_factor += 0.10
 
         processed = ImageEnhance.Brightness(image).enhance(brightness_factor)
         processed = ImageEnhance.Contrast(processed).enhance(contrast_factor)

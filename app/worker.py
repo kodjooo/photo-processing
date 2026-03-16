@@ -26,4 +26,5 @@ async def run_worker() -> None:
             async with semaphore:
                 await processor.process_job(job_id)
     finally:
+        await processor.close()
         await queue.close()

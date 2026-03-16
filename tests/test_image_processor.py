@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from PIL import Image
+from PIL import Image, ImageStat
 
 from app.enums import ProcessingPreset
 from app.processing import images as images_module
@@ -68,3 +68,37 @@ def test_image_processor_supports_raw_input(tmp_path: Path, monkeypatch) -> None
     assert target_path.exists()
     result = Image.open(target_path)
     assert result.size == (300, 200)
+
+
+def test_load_logo_uses_horizontal_ratio_for_landscape(tmp_path: Path) -> None:
+    logo_path = tmp_path / "logo.png"
+    Image.new("RGBA", (200, 100), (255, 255, 255, 255)).save(logo_path)
+
+    processor = ImageProcessor()
+    resized = processor.load_logo(str(logo_path), base_width=1000, base_height=600)
+
+    assert resized.width == 150
+
+
+def test_load_logo_uses_vertical_ratio_for_portrait(tmp_path: Path) -> None:
+    logo_path = tmp_path / "logo.png"
+    Image.new("RGBA", (200, 100), (255, 255, 255, 255)).save(logo_path)
+
+    processor = ImageProcessor()
+    resized = processor.load_logo(str(logo_path), base_width=800, base_height=1200)
+
+    assert resized.width == 200
+
+
+def test_strong_preset_is_more_aggressive_than_natural() -> None:
+    processor = ImageProcessor()
+    image = Image.new("RGB", (200, 120), (90, 100, 110))
+    metrics = processor.calculate_metrics(image)
+
+    natural = processor.apply_pipeline(image, metrics, ProcessingPreset.NATURAL)
+    strong = processor.apply_pipeline(image, metrics, ProcessingPreset.STRONG)
+
+    natural_stat = ImageStat.Stat(natural)
+    strong_stat = ImageStat.Stat(strong)
+
+    assert sum(strong_stat.mean) > sum(natural_stat.mean)

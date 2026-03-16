@@ -69,6 +69,9 @@ class StorageService:
 
         for path in all_files:
             relative_path = str(path.relative_to(unpacked_dir))
+            if self._is_macos_service_file(path, unpacked_dir):
+                skipped_files.append((relative_path, "Служебный файл macOS пропущен"))
+                continue
             suffix = path.suffix.lower()
             if suffix in SUPPORTED_IMAGE_SUFFIXES:
                 supported_files.append(path)
@@ -86,6 +89,8 @@ class StorageService:
 
     def build_output_path(self, unpacked_dir: Path, output_dir: Path, source_path: Path) -> Path:
         relative = source_path.relative_to(unpacked_dir)
+        if source_path.suffix.lower() in {".cr2", ".arw"}:
+            relative = relative.with_suffix(".jpg")
         target = output_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         return target
@@ -98,3 +103,7 @@ class StorageService:
 
     def cleanup(self, job_root: Path) -> None:
         shutil.rmtree(job_root, ignore_errors=True)
+
+    def _is_macos_service_file(self, path: Path, unpacked_dir: Path) -> bool:
+        relative_parts = path.relative_to(unpacked_dir).parts
+        return "__MACOSX" in relative_parts or path.name.startswith("._")

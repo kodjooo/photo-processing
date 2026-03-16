@@ -8,6 +8,7 @@ from app.db import SessionLocal
 from app.enums import FileStatus, JobStatus
 from app.processing.images import ImageProcessor
 from app.repositories.jobs import JobRepository
+from app.services.notifications import NotificationService
 from app.services.storage import StorageService
 from app.services.yandex_disk import YandexDiskService
 
@@ -27,6 +28,7 @@ class JobProcessor:
         self.storage = StorageService()
         self.disk = YandexDiskService()
         self.images = ImageProcessor()
+        self.notifications = NotificationService()
 
     async def process_job(self, job_id: str) -> None:
         async with SessionLocal() as session:
@@ -91,6 +93,13 @@ class JobProcessor:
                 result_url = await self.disk.upload_result(paths.result_archive_path, f"{job.id}.zip")
                 await repository.update_counters(job, result_url=result_url)
                 await repository.set_status(job, JobStatus.COMPLETED, "Обработка завершена")
+                await self.notifications.send_job_completed(
+                    telegram_user_id=job.telegram_user_id,
+                    job_id=job.id,
+                    result_url=result_url,
+                    processed_files=processed_count,
+                    skipped_files=skipped_count,
+                )
             except asyncio.CancelledError:
                 logger.info("Задача %s отменена во время выполнения", job_id)
                 await repository.set_status(job, JobStatus.CANCELLED, "Задача отменена во время выполнения")
@@ -98,8 +107,16 @@ class JobProcessor:
                 logger.exception("Ошибка обработки задачи %s", job_id)
                 await repository.update_counters(job, error_message=str(error))
                 await repository.set_status(job, JobStatus.FAILED, "Ошибка обработки")
+                await self.notifications.send_job_failed(
+                    telegram_user_id=job.telegram_user_id,
+                    job_id=job.id,
+                    error_message=str(error),
+                )
             finally:
                 self.storage.cleanup(paths.root)
+
+    async def close(self) -> None:
+        await self.notifications.close()
 
     async def _download_archive(self, source_url: str, target_path: Path) -> None:
         resource_info = await self.disk.get_public_resource_info(source_url)

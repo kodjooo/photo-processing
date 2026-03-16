@@ -23,8 +23,9 @@ class FileStatus(StrEnum):
 
 class ProcessingPreset(StrEnum):
     DEFAULT = "default"
-    SOFT = "soft"
-    CONTRAST = "contrast"
+    NATURAL = "natural"
+    BALANCED = "balanced"
+    STRONG = "strong"
 
 
 TERMINAL_STATUSES = {
@@ -32,4 +33,3 @@ TERMINAL_STATUSES = {
     JobStatus.FAILED,
     JobStatus.CANCELLED,
 }
-

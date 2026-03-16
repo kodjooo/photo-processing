@@ -2,7 +2,7 @@ import logging
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from app.config import get_settings
 from app.db import SessionLocal
@@ -12,11 +12,14 @@ from app.services.job_manager import JobManager
 
 logger = logging.getLogger(__name__)
 
+PRESET_CALLBACK_PREFIX = "preset:"
+PENDING_LINKS: dict[int, str] = {}
+
 
 def _help_text() -> str:
     return (
         "Отправьте публичную ссылку Яндекс Диска на ZIP-архив или используйте:\n"
-        "/process <ссылка>\n"
+        "/process <ссылка> [preset]\n"
         "/status <job_id>\n"
         "/cancel <job_id>\n"
         "/last\n"
@@ -40,7 +43,13 @@ async def cmd_help(message: Message) -> None:
 
 
 async def cmd_presets(message: Message) -> None:
-    await message.answer("Доступные режимы: default, soft, contrast")
+    await message.answer(
+        "Доступные режимы:\n"
+        "natural — минимальная и аккуратная коррекция\n"
+        "balanced — усиление по умолчанию\n"
+        "strong — более заметное усиление\n"
+        "default — алиас balanced"
+    )
 
 
 async def cmd_logo(message: Message) -> None:
@@ -49,9 +58,19 @@ async def cmd_logo(message: Message) -> None:
 
 async def cmd_process(message: Message, command: CommandObject) -> None:
     if command.args is None:
-        await message.answer("Нужна ссылка: /process <ссылка>")
+        await message.answer("Нужна ссылка: /process <ссылка> [preset]")
         return
-    await _process_url(message, command.args.strip())
+    parts = command.args.strip().split(maxsplit=1)
+    source_url = parts[0]
+    if len(parts) == 2:
+        try:
+            preset = ProcessingPreset(parts[1].strip().lower())
+        except ValueError:
+            await message.answer("Неизвестный preset. Используйте /presets")
+            return
+        await _process_url(message, source_url, preset)
+        return
+    await _ask_for_preset(message, source_url)
 
 
 async def cmd_status(message: Message, command: CommandObject) -> None:
@@ -97,15 +116,59 @@ async def cmd_last(message: Message) -> None:
 
 async def on_url_message(message: Message) -> None:
     text = (message.text or "").strip()
-    await _process_url(message, text)
+    await _ask_for_preset(message, text)
 
 
-async def _process_url(message: Message, source_url: str) -> None:
+async def on_preset_selected(callback: CallbackQuery) -> None:
+    if callback.data is None or not callback.data.startswith(PRESET_CALLBACK_PREFIX):
+        await callback.answer()
+        return
+
+    source_url = PENDING_LINKS.get(callback.from_user.id)
+    if not source_url:
+        await callback.answer("Ссылка уже устарела, отправьте ее заново", show_alert=True)
+        return
+
+    preset_value = callback.data.removeprefix(PRESET_CALLBACK_PREFIX)
+    try:
+        preset = ProcessingPreset(preset_value)
+    except ValueError:
+        await callback.answer("Неизвестный preset", show_alert=True)
+        return
+
+    PENDING_LINKS.pop(callback.from_user.id, None)
+    await callback.answer(f"Выбран режим: {preset}")
+    if callback.message is not None:
+        await callback.message.edit_reply_markup(reply_markup=None)
+        await _process_url(callback.message, source_url, preset)
+
+
+async def _ask_for_preset(message: Message, source_url: str) -> None:
+    PENDING_LINKS[message.from_user.id] = source_url
+    await message.answer(
+        "Выберите пресет для обработки:",
+        reply_markup=_preset_keyboard(),
+    )
+
+
+def _preset_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Natural", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.NATURAL}"),
+                InlineKeyboardButton(text="Balanced", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.BALANCED}"),
+                InlineKeyboardButton(text="Strong", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.STRONG}"),
+            ]
+        ]
+    )
+
+
+async def _process_url(message: Message, source_url: str, preset: ProcessingPreset) -> None:
     async def action(manager: JobManager):
         return await manager.create_job(
             telegram_user_id=message.from_user.id,
             source_url=source_url,
-            preset=ProcessingPreset.DEFAULT,
+            preset=preset,
         )
 
     try:
@@ -113,7 +176,7 @@ async def _process_url(message: Message, source_url: str) -> None:
     except ValueError as error:
         await message.answer(str(error))
         return
-    await message.answer(f"Задача создана: {job.id}\nСтатус: {job.status}")
+    await message.answer(f"Задача создана: {job.id}\nСтатус: {job.status}\nРежим: {job.preset}")
 
 
 def _format_job(job) -> str:
@@ -146,5 +209,5 @@ async def run_bot() -> None:
     dispatcher.message.register(cmd_cancel, Command("cancel"))
     dispatcher.message.register(cmd_last, Command("last"))
     dispatcher.message.register(on_url_message, F.text)
+    dispatcher.callback_query.register(on_preset_selected, F.data.startswith(PRESET_CALLBACK_PREFIX))
     await dispatcher.start_polling(bot)
-

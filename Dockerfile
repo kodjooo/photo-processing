@@ -2,7 +2,8 @@
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 WORKDIR /app
 
@@ -17,7 +18,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY app ./app
 COPY tests ./tests
-COPY app/assets ./app/assets
+COPY app/assets /app/assets
 
 RUN mkdir -p /app/assets
 

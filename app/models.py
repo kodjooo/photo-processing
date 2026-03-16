@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -12,7 +12,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    telegram_user_id: Mapped[int] = mapped_column(Integer, index=True)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     source_url: Mapped[str] = mapped_column(Text)
     preset: Mapped[ProcessingPreset] = mapped_column(
         Enum(ProcessingPreset, native_enum=False),
@@ -58,4 +58,3 @@ class JobFile(Base):
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     job: Mapped[Job] = relationship(back_populates="files")
-

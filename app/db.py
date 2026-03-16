@@ -25,4 +25,6 @@ async def init_database() -> None:
 
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
-
+        await connection.exec_driver_sql(
+            "ALTER TABLE jobs ALTER COLUMN telegram_user_id TYPE BIGINT"
+        )

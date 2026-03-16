@@ -44,6 +44,7 @@ class JobManager:
         return self._to_response(job)
 
     def _to_response(self, job) -> JobResponse:
+        loaded_files = job.__dict__.get("files", [])
         return JobResponse(
             id=job.id,
             telegram_user_id=job.telegram_user_id,
@@ -64,7 +65,6 @@ class JobManager:
                     "status": item.status,
                     "reason": item.reason,
                 }
-                for item in getattr(job, "files", [])
+                for item in loaded_files
             ],
         )
-
