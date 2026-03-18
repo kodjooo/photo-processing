@@ -7,6 +7,7 @@ from app.enums import FileStatus, JobStatus, ProcessingPreset
 
 class CreateJobRequest(BaseModel):
     telegram_user_id: int
+    telegram_chat_id: int | None = None
     source_url: HttpUrl
     preset: ProcessingPreset = ProcessingPreset.DEFAULT
 
@@ -20,6 +21,7 @@ class JobFileResponse(BaseModel):
 class JobResponse(BaseModel):
     id: str
     telegram_user_id: int
+    telegram_chat_id: int
     source_url: str
     preset: ProcessingPreset
     status: JobStatus
@@ -41,4 +43,3 @@ class CancelJobResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-

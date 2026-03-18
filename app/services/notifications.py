@@ -11,7 +11,7 @@ class NotificationService:
     async def send_job_completed(
         self,
         *,
-        telegram_user_id: int,
+        telegram_chat_id: int,
         job_id: str,
         result_url: str,
         processed_files: int,
@@ -23,12 +23,12 @@ class NotificationService:
             f"Пропущено: {skipped_files}\n"
             f"Результат: {result_url}"
         )
-        await self.bot.send_message(chat_id=telegram_user_id, text=text)
+        await self.bot.send_message(chat_id=telegram_chat_id, text=text)
 
     async def send_job_failed(
         self,
         *,
-        telegram_user_id: int,
+        telegram_chat_id: int,
         job_id: str,
         error_message: str,
     ) -> None:
@@ -36,8 +36,7 @@ class NotificationService:
             f"Задача завершилась с ошибкой: {job_id}\n"
             f"Причина: {error_message}"
         )
-        await self.bot.send_message(chat_id=telegram_user_id, text=text)
+        await self.bot.send_message(chat_id=telegram_chat_id, text=text)
 
     async def close(self) -> None:
         await self.bot.session.close()
-

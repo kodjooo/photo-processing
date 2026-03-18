@@ -12,10 +12,11 @@ class JobManager:
         self.repository = JobRepository(session)
         self.queue = QueueService()
 
-    async def create_job(self, telegram_user_id: int, source_url: str, preset: str) -> JobResponse:
+    async def create_job(self, telegram_user_id: int, telegram_chat_id: int, source_url: str, preset: str) -> JobResponse:
         validate_yandex_public_url(source_url)
         job = await self.repository.create_job(
             telegram_user_id=telegram_user_id,
+            telegram_chat_id=telegram_chat_id,
             source_url=source_url,
             preset=preset,
         )
@@ -48,6 +49,7 @@ class JobManager:
         return JobResponse(
             id=job.id,
             telegram_user_id=job.telegram_user_id,
+            telegram_chat_id=job.telegram_chat_id,
             source_url=job.source_url,
             preset=job.preset,
             status=job.status,

@@ -13,6 +13,7 @@ class Job(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    telegram_chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
     source_url: Mapped[str] = mapped_column(Text)
     preset: Mapped[ProcessingPreset] = mapped_column(
         Enum(ProcessingPreset, native_enum=False),

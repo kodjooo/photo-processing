@@ -90,53 +90,53 @@ class ImageProcessor:
 
         brightness_factor = 1.0
         contrast_factor = 1.0
-        color_factor = 1.02
-        sharpness_factor = 1.01
-        shadow_lift = 0.10
-        highlight_recovery = 0.08
-        local_contrast_strength = 0.08
-        vibrance_strength = 0.05
+        color_factor = 1.01
+        sharpness_factor = 1.0
+        shadow_lift = 0.05
+        highlight_recovery = 0.04
+        local_contrast_strength = 0.03
+        vibrance_strength = 0.02
 
         if metrics.brightness < 0.42:
-            brightness_factor += 0.08
-            shadow_lift += 0.05
+            brightness_factor += 0.04
+            shadow_lift += 0.03
         if metrics.bright_ratio > 0.18:
-            brightness_factor -= 0.03
-            highlight_recovery += 0.06
+            brightness_factor -= 0.02
+            highlight_recovery += 0.03
         if metrics.contrast < 0.20:
-            contrast_factor += 0.10
-            local_contrast_strength += 0.06
+            contrast_factor += 0.05
+            local_contrast_strength += 0.03
         if metrics.sharpness < 0.08:
-            sharpness_factor += 0.08
+            sharpness_factor += 0.03
 
         if preset == ProcessingPreset.NATURAL:
-            brightness_factor -= 0.01 if metrics.bright_ratio > 0.12 else 0.0
-            contrast_factor -= 0.02
-            color_factor = 1.01
-            sharpness_factor -= 0.01
-            shadow_lift *= 0.70
-            highlight_recovery *= 0.70
-            local_contrast_strength *= 0.75
-            vibrance_strength = 0.03
+            brightness_factor -= 0.005 if metrics.bright_ratio > 0.12 else 0.0
+            contrast_factor -= 0.01
+            color_factor = 1.0
+            sharpness_factor = max(0.98, sharpness_factor - 0.005)
+            shadow_lift *= 0.65
+            highlight_recovery *= 0.65
+            local_contrast_strength *= 0.60
+            vibrance_strength = 0.01
         elif preset == ProcessingPreset.BALANCED:
             if metrics.dark_ratio > 0.20:
-                brightness_factor += 0.03
-                shadow_lift += 0.05
-            contrast_factor += 0.04
-            color_factor = 1.04
-            sharpness_factor += 0.03
-            local_contrast_strength += 0.04
-            vibrance_strength = 0.08
+                brightness_factor += 0.015
+                shadow_lift += 0.025
+            contrast_factor += 0.02
+            color_factor = 1.02
+            sharpness_factor += 0.015
+            local_contrast_strength += 0.02
+            vibrance_strength = 0.035
         elif preset == ProcessingPreset.STRONG:
             if metrics.dark_ratio > 0.20:
-                brightness_factor += 0.05
-                shadow_lift += 0.08
-            contrast_factor += 0.12
-            color_factor = 1.06
-            sharpness_factor += 0.06
-            highlight_recovery += 0.03
-            local_contrast_strength += 0.08
-            vibrance_strength = 0.12
+                brightness_factor += 0.03
+                shadow_lift += 0.04
+            contrast_factor += 0.05
+            color_factor = 1.035
+            sharpness_factor += 0.03
+            highlight_recovery += 0.015
+            local_contrast_strength += 0.04
+            vibrance_strength = 0.055
 
         processed = ImageEnhance.Brightness(image).enhance(brightness_factor)
         processed = ImageEnhance.Contrast(processed).enhance(contrast_factor)
@@ -147,9 +147,9 @@ class ImageProcessor:
         processed = ImageEnhance.Color(processed).enhance(color_factor)
         processed = processed.filter(
             ImageFilter.UnsharpMask(
-                radius=1.8,
-                percent=max(80, int(sharpness_factor * 90)),
-                threshold=3,
+                radius=1.4,
+                percent=max(45, int(sharpness_factor * 55)),
+                threshold=4,
             )
         )
         processed = ImageEnhance.Sharpness(processed).enhance(sharpness_factor)
@@ -169,12 +169,12 @@ class ImageProcessor:
         rgb = np.asarray(image, dtype=np.float32) / 255.0
         luminance = 0.2126 * rgb[:, :, 0] + 0.7152 * rgb[:, :, 1] + 0.0722 * rgb[:, :, 2]
 
-        shadow_mask = np.clip((0.55 - luminance) / 0.35, 0.0, 1.0)
-        highlight_mask = np.clip((luminance - 0.62) / 0.28, 0.0, 1.0)
+        shadow_mask = np.clip((0.50 - luminance) / 0.30, 0.0, 1.0)
+        highlight_mask = np.clip((luminance - 0.72) / 0.20, 0.0, 1.0)
 
         adjusted_luminance = luminance
-        adjusted_luminance = adjusted_luminance + shadow_lift * shadow_mask * (1.0 - adjusted_luminance)
-        adjusted_luminance = adjusted_luminance - highlight_recovery * highlight_mask * adjusted_luminance
+        adjusted_luminance = adjusted_luminance + shadow_lift * shadow_mask * (1.0 - adjusted_luminance) * 0.8
+        adjusted_luminance = adjusted_luminance - highlight_recovery * highlight_mask * adjusted_luminance * 0.75
         adjusted_luminance = np.clip(adjusted_luminance, 0.0, 1.0)
 
         scale = adjusted_luminance / np.maximum(luminance, 0.05)
@@ -187,9 +187,9 @@ class ImageProcessor:
 
         rgb = np.asarray(image, dtype=np.float32) / 255.0
         base = Image.fromarray((rgb * 255).astype(np.uint8), mode="RGB")
-        blurred = np.asarray(base.filter(ImageFilter.GaussianBlur(radius=12)), dtype=np.float32) / 255.0
+        blurred = np.asarray(base.filter(ImageFilter.GaussianBlur(radius=14)), dtype=np.float32) / 255.0
         detail = rgb - blurred
-        enhanced = np.clip(rgb + detail * strength * 1.8, 0.0, 1.0)
+        enhanced = np.clip(rgb + detail * strength * 1.1, 0.0, 1.0)
         return Image.fromarray((enhanced * 255).astype(np.uint8), mode="RGB")
 
     def _apply_vibrance(self, image: Image.Image, strength: float) -> Image.Image:
@@ -201,7 +201,8 @@ class ImageProcessor:
         min_channel = rgb.min(axis=2)
         saturation = np.clip(max_channel - min_channel, 0.0, 1.0)
         gray = rgb.mean(axis=2, keepdims=True)
-        per_pixel_boost = 1.0 + strength * (1.0 - saturation)[:, :, None]
+        skin_bias = np.clip((rgb[:, :, 0] - rgb[:, :, 2]) * 1.5, 0.0, 1.0)
+        per_pixel_boost = 1.0 + strength * (1.0 - saturation)[:, :, None] * (1.0 - 0.35 * skin_bias[:, :, None])
         vibrant = np.clip(gray + (rgb - gray) * per_pixel_boost, 0.0, 1.0)
         return Image.fromarray((vibrant * 255).astype(np.uint8), mode="RGB")
 

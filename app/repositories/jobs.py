@@ -12,8 +12,14 @@ class JobRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_job(self, telegram_user_id: int, source_url: str, preset: str) -> Job:
-        job = Job(telegram_user_id=telegram_user_id, source_url=source_url, preset=preset, status=JobStatus.CREATED)
+    async def create_job(self, telegram_user_id: int, telegram_chat_id: int, source_url: str, preset: str) -> Job:
+        job = Job(
+            telegram_user_id=telegram_user_id,
+            telegram_chat_id=telegram_chat_id,
+            source_url=source_url,
+            preset=preset,
+            status=JobStatus.CREATED,
+        )
         self.session.add(job)
         self.session.add(JobEvent(job=job, status=JobStatus.CREATED, message="Задача создана"))
         await self.session.commit()

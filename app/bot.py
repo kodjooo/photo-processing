@@ -167,6 +167,7 @@ async def _process_url(message: Message, source_url: str, preset: ProcessingPres
     async def action(manager: JobManager):
         return await manager.create_job(
             telegram_user_id=message.from_user.id,
+            telegram_chat_id=message.chat.id,
             source_url=source_url,
             preset=preset,
         )

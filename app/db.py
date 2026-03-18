@@ -28,3 +28,12 @@ async def init_database() -> None:
         await connection.exec_driver_sql(
             "ALTER TABLE jobs ALTER COLUMN telegram_user_id TYPE BIGINT"
         )
+        await connection.exec_driver_sql(
+            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS telegram_chat_id BIGINT"
+        )
+        await connection.exec_driver_sql(
+            "UPDATE jobs SET telegram_chat_id = telegram_user_id WHERE telegram_chat_id IS NULL"
+        )
+        await connection.exec_driver_sql(
+            "ALTER TABLE jobs ALTER COLUMN telegram_chat_id SET NOT NULL"
+        )

@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
         try:
             return await manager.create_job(
                 telegram_user_id=payload.telegram_user_id,
+                telegram_chat_id=payload.telegram_chat_id or payload.telegram_user_id,
                 source_url=str(payload.source_url),
                 preset=payload.preset,
             )
@@ -64,4 +65,3 @@ def create_app() -> FastAPI:
         return job
 
     return app
-
