@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
+
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
 try:
@@ -84,47 +86,124 @@ class ImageProcessor:
         metrics: ImageMetrics,
         preset: ProcessingPreset,
     ) -> Image.Image:
+        preset = self._normalize_preset(preset)
+
         brightness_factor = 1.0
         contrast_factor = 1.0
-        color_factor = 1.03
-        sharpness_factor = 1.02
+        color_factor = 1.02
+        sharpness_factor = 1.01
+        shadow_lift = 0.10
+        highlight_recovery = 0.08
+        local_contrast_strength = 0.08
+        vibrance_strength = 0.05
 
         if metrics.brightness < 0.42:
             brightness_factor += 0.08
+            shadow_lift += 0.05
         if metrics.bright_ratio > 0.18:
             brightness_factor -= 0.03
+            highlight_recovery += 0.06
         if metrics.contrast < 0.20:
             contrast_factor += 0.10
+            local_contrast_strength += 0.06
         if metrics.sharpness < 0.08:
             sharpness_factor += 0.08
-
-        if preset == ProcessingPreset.DEFAULT:
-            preset = ProcessingPreset.BALANCED
 
         if preset == ProcessingPreset.NATURAL:
             brightness_factor -= 0.01 if metrics.bright_ratio > 0.12 else 0.0
             contrast_factor -= 0.02
             color_factor = 1.01
             sharpness_factor -= 0.01
+            shadow_lift *= 0.70
+            highlight_recovery *= 0.70
+            local_contrast_strength *= 0.75
+            vibrance_strength = 0.03
         elif preset == ProcessingPreset.BALANCED:
             if metrics.dark_ratio > 0.20:
                 brightness_factor += 0.03
+                shadow_lift += 0.05
             contrast_factor += 0.04
-            color_factor = 1.06
-            sharpness_factor += 0.04
+            color_factor = 1.04
+            sharpness_factor += 0.03
+            local_contrast_strength += 0.04
+            vibrance_strength = 0.08
         elif preset == ProcessingPreset.STRONG:
             if metrics.dark_ratio > 0.20:
                 brightness_factor += 0.05
+                shadow_lift += 0.08
             contrast_factor += 0.12
-            color_factor = 1.10
-            sharpness_factor += 0.10
+            color_factor = 1.06
+            sharpness_factor += 0.06
+            highlight_recovery += 0.03
+            local_contrast_strength += 0.08
+            vibrance_strength = 0.12
 
         processed = ImageEnhance.Brightness(image).enhance(brightness_factor)
         processed = ImageEnhance.Contrast(processed).enhance(contrast_factor)
         processed = processed.filter(ImageFilter.MedianFilter(size=3))
+        processed = self._apply_local_tone_mapping(processed, shadow_lift, highlight_recovery)
+        processed = self._apply_local_contrast(processed, local_contrast_strength)
+        processed = self._apply_vibrance(processed, vibrance_strength)
         processed = ImageEnhance.Color(processed).enhance(color_factor)
+        processed = processed.filter(
+            ImageFilter.UnsharpMask(
+                radius=1.8,
+                percent=max(80, int(sharpness_factor * 90)),
+                threshold=3,
+            )
+        )
         processed = ImageEnhance.Sharpness(processed).enhance(sharpness_factor)
         return processed
+
+    def _normalize_preset(self, preset: ProcessingPreset) -> ProcessingPreset:
+        if preset == ProcessingPreset.DEFAULT:
+            return ProcessingPreset.BALANCED
+        return preset
+
+    def _apply_local_tone_mapping(
+        self,
+        image: Image.Image,
+        shadow_lift: float,
+        highlight_recovery: float,
+    ) -> Image.Image:
+        rgb = np.asarray(image, dtype=np.float32) / 255.0
+        luminance = 0.2126 * rgb[:, :, 0] + 0.7152 * rgb[:, :, 1] + 0.0722 * rgb[:, :, 2]
+
+        shadow_mask = np.clip((0.55 - luminance) / 0.35, 0.0, 1.0)
+        highlight_mask = np.clip((luminance - 0.62) / 0.28, 0.0, 1.0)
+
+        adjusted_luminance = luminance
+        adjusted_luminance = adjusted_luminance + shadow_lift * shadow_mask * (1.0 - adjusted_luminance)
+        adjusted_luminance = adjusted_luminance - highlight_recovery * highlight_mask * adjusted_luminance
+        adjusted_luminance = np.clip(adjusted_luminance, 0.0, 1.0)
+
+        scale = adjusted_luminance / np.maximum(luminance, 0.05)
+        toned = np.clip(rgb * scale[:, :, None], 0.0, 1.0)
+        return Image.fromarray((toned * 255).astype(np.uint8), mode="RGB")
+
+    def _apply_local_contrast(self, image: Image.Image, strength: float) -> Image.Image:
+        if strength <= 0:
+            return image
+
+        rgb = np.asarray(image, dtype=np.float32) / 255.0
+        base = Image.fromarray((rgb * 255).astype(np.uint8), mode="RGB")
+        blurred = np.asarray(base.filter(ImageFilter.GaussianBlur(radius=12)), dtype=np.float32) / 255.0
+        detail = rgb - blurred
+        enhanced = np.clip(rgb + detail * strength * 1.8, 0.0, 1.0)
+        return Image.fromarray((enhanced * 255).astype(np.uint8), mode="RGB")
+
+    def _apply_vibrance(self, image: Image.Image, strength: float) -> Image.Image:
+        if strength <= 0:
+            return image
+
+        rgb = np.asarray(image, dtype=np.float32) / 255.0
+        max_channel = rgb.max(axis=2)
+        min_channel = rgb.min(axis=2)
+        saturation = np.clip(max_channel - min_channel, 0.0, 1.0)
+        gray = rgb.mean(axis=2, keepdims=True)
+        per_pixel_boost = 1.0 + strength * (1.0 - saturation)[:, :, None]
+        vibrant = np.clip(gray + (rgb - gray) * per_pixel_boost, 0.0, 1.0)
+        return Image.fromarray((vibrant * 255).astype(np.uint8), mode="RGB")
 
     def apply_logos(self, image: Image.Image, left_logo_path: str, right_logo_path: str) -> Image.Image:
         canvas = image.convert("RGBA")

@@ -102,3 +102,41 @@ def test_strong_preset_is_more_aggressive_than_natural() -> None:
     strong_stat = ImageStat.Stat(strong)
 
     assert sum(strong_stat.mean) > sum(natural_stat.mean)
+
+
+def test_adaptive_pipeline_lifts_shadows_more_than_highlights() -> None:
+    processor = ImageProcessor()
+    gradient = np.tile(np.linspace(20, 240, 256, dtype=np.uint8), (64, 1))
+    image = Image.fromarray(np.stack([gradient, gradient, gradient], axis=2), mode="RGB")
+    metrics = processor.calculate_metrics(image)
+
+    processed = processor.apply_pipeline(image, metrics, ProcessingPreset.BALANCED)
+
+    original = np.asarray(image, dtype=np.float32)
+    enhanced = np.asarray(processed, dtype=np.float32)
+
+    shadow_gain = enhanced[:, :32].mean() - original[:, :32].mean()
+    highlight_gain = enhanced[:, -32:].mean() - original[:, -32:].mean()
+
+    assert shadow_gain > 0
+    assert shadow_gain > highlight_gain
+
+
+def test_local_contrast_changes_midtones_without_blowing_out_highlights() -> None:
+    processor = ImageProcessor()
+    image = Image.new("RGB", (120, 120), (150, 150, 150))
+    for x in range(40, 80):
+        for y in range(40, 80):
+            image.putpixel((x, y), (175, 175, 175))
+
+    metrics = processor.calculate_metrics(image)
+    processed = processor.apply_pipeline(image, metrics, ProcessingPreset.STRONG)
+
+    original = np.asarray(image, dtype=np.float32)
+    enhanced = np.asarray(processed, dtype=np.float32)
+
+    center_delta = enhanced[45:75, 45:75].mean() - original[45:75, 45:75].mean()
+    corner_delta = enhanced[:20, :20].mean() - original[:20, :20].mean()
+
+    assert center_delta != 0
+    assert abs(center_delta - corner_delta) > 0.5
