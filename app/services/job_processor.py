@@ -27,6 +27,7 @@ class ProcessedFile:
 @dataclass(slots=True)
 class DebugArchive:
     label: str
+    local_path: Path
     remote_name: str
     public_url: str
 
@@ -111,7 +112,7 @@ class JobProcessor:
                 result_url = await self.disk.upload_result(paths.result_archive_path, f"{job.id}.zip")
                 for archive in debug_archives:
                     archive.public_url = await self.disk.upload_result(
-                        paths.result_dir / archive.remote_name,
+                        archive.local_path,
                         archive.remote_name,
                     )
                 await repository.update_counters(job, result_url=result_url)
@@ -272,11 +273,13 @@ class JobProcessor:
         return [
             DebugArchive(
                 label="декодирование с автоосветлением",
+                local_path=paths.decode_auto_bright_archive_path,
                 remote_name=f"{job_id}-decoded-auto-bright.zip",
                 public_url="",
             ),
             DebugArchive(
                 label="декодирование без автоосветления",
+                local_path=paths.decode_natural_archive_path,
                 remote_name=f"{job_id}-decoded-natural.zip",
                 public_url="",
             ),
