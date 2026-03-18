@@ -26,6 +26,9 @@ class ProcessingPreset(StrEnum):
     NATURAL = "natural"
     BALANCED = "balanced"
     STRONG = "strong"
+    GLOBAL_NATURAL = "global_natural"
+    GLOBAL_BALANCED = "global_balanced"
+    GLOBAL_STRONG = "global_strong"
 
 
 TERMINAL_STATUSES = {

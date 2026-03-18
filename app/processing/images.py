@@ -87,6 +87,17 @@ class ImageProcessor:
         preset: ProcessingPreset,
     ) -> Image.Image:
         preset = self._normalize_preset(preset)
+        if self._is_global_preset(preset):
+            return self._apply_global_pipeline(image, metrics, preset)
+        return self._apply_local_pipeline(image, metrics, preset)
+
+    def _apply_local_pipeline(
+        self,
+        image: Image.Image,
+        metrics: ImageMetrics,
+        preset: ProcessingPreset,
+    ) -> Image.Image:
+        preset = self._normalize_preset(preset)
 
         brightness_factor = 1.0
         contrast_factor = 1.0
@@ -155,10 +166,67 @@ class ImageProcessor:
         processed = ImageEnhance.Sharpness(processed).enhance(sharpness_factor)
         return processed
 
+    def _apply_global_pipeline(
+        self,
+        image: Image.Image,
+        metrics: ImageMetrics,
+        preset: ProcessingPreset,
+    ) -> Image.Image:
+        brightness_factor = 1.0
+        contrast_factor = 1.0
+        color_factor = 1.0
+        sharpness_factor = 1.0
+
+        if metrics.brightness < 0.42:
+            brightness_factor += 0.035
+        if metrics.bright_ratio > 0.18:
+            brightness_factor -= 0.02
+        if metrics.contrast < 0.20:
+            contrast_factor += 0.04
+        if metrics.sharpness < 0.08:
+            sharpness_factor += 0.02
+
+        if preset == ProcessingPreset.GLOBAL_NATURAL:
+            contrast_factor -= 0.01
+            color_factor = 1.0
+        elif preset == ProcessingPreset.GLOBAL_BALANCED:
+            if metrics.dark_ratio > 0.20:
+                brightness_factor += 0.01
+            contrast_factor += 0.015
+            color_factor = 1.015
+            sharpness_factor += 0.01
+        elif preset == ProcessingPreset.GLOBAL_STRONG:
+            if metrics.dark_ratio > 0.20:
+                brightness_factor += 0.02
+            contrast_factor += 0.04
+            color_factor = 1.03
+            sharpness_factor += 0.02
+
+        processed = ImageEnhance.Brightness(image).enhance(brightness_factor)
+        processed = ImageEnhance.Contrast(processed).enhance(contrast_factor)
+        processed = processed.filter(ImageFilter.MedianFilter(size=3))
+        processed = ImageEnhance.Color(processed).enhance(color_factor)
+        processed = processed.filter(
+            ImageFilter.UnsharpMask(
+                radius=1.1,
+                percent=max(35, int(sharpness_factor * 45)),
+                threshold=5,
+            )
+        )
+        processed = ImageEnhance.Sharpness(processed).enhance(sharpness_factor)
+        return processed
+
     def _normalize_preset(self, preset: ProcessingPreset) -> ProcessingPreset:
         if preset == ProcessingPreset.DEFAULT:
             return ProcessingPreset.BALANCED
         return preset
+
+    def _is_global_preset(self, preset: ProcessingPreset) -> bool:
+        return preset in {
+            ProcessingPreset.GLOBAL_NATURAL,
+            ProcessingPreset.GLOBAL_BALANCED,
+            ProcessingPreset.GLOBAL_STRONG,
+        }
 
     def _apply_local_tone_mapping(
         self,
@@ -208,8 +276,8 @@ class ImageProcessor:
 
     def apply_logos(self, image: Image.Image, left_logo_path: str, right_logo_path: str) -> Image.Image:
         canvas = image.convert("RGBA")
-        left_logo = self._set_opacity(self.load_logo(left_logo_path, canvas.width, canvas.height), 0.35)
-        right_logo = self._set_opacity(self.load_logo(right_logo_path, canvas.width, canvas.height), 0.35)
+        left_logo = self._set_opacity(self.load_logo(left_logo_path, canvas.width, canvas.height), 0.55)
+        right_logo = self._set_opacity(self.load_logo(right_logo_path, canvas.width, canvas.height), 0.55)
         padding = max(16, int(canvas.width * 0.02))
         canvas.alpha_composite(left_logo, (padding, max(0, canvas.height - left_logo.height - padding)))
         canvas.alpha_composite(

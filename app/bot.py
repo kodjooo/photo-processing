@@ -45,9 +45,14 @@ async def cmd_help(message: Message) -> None:
 async def cmd_presets(message: Message) -> None:
     await message.answer(
         "Доступные режимы:\n"
-        "natural — минимальная и аккуратная коррекция\n"
-        "balanced — усиление по умолчанию\n"
-        "strong — более заметное усиление\n"
+        "Локальная проработка:\n"
+        "natural — деликатная локальная коррекция\n"
+        "balanced — локальная коррекция по умолчанию\n"
+        "strong — более заметная локальная коррекция\n"
+        "Общая проработка:\n"
+        "global_natural — деликатная общая коррекция кадра\n"
+        "global_balanced — общая коррекция по умолчанию\n"
+        "global_strong — более заметная общая коррекция кадра\n"
         "default — алиас balanced"
     )
 
@@ -155,10 +160,24 @@ def _preset_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Natural", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.NATURAL}"),
-                InlineKeyboardButton(text="Balanced", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.BALANCED}"),
-                InlineKeyboardButton(text="Strong", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.STRONG}"),
-            ]
+                InlineKeyboardButton(text="Local Natural", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.NATURAL}"),
+                InlineKeyboardButton(text="Local Balanced", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.BALANCED}"),
+                InlineKeyboardButton(text="Local Strong", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.STRONG}"),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Global Natural",
+                    callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.GLOBAL_NATURAL}",
+                ),
+                InlineKeyboardButton(
+                    text="Global Balanced",
+                    callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.GLOBAL_BALANCED}",
+                ),
+                InlineKeyboardButton(
+                    text="Global Strong",
+                    callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.GLOBAL_STRONG}",
+                ),
+            ],
         ]
     )
 

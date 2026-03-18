@@ -140,3 +140,32 @@ def test_local_contrast_changes_midtones_without_blowing_out_highlights() -> Non
 
     assert center_delta != 0
     assert abs(center_delta - corner_delta) > 0.5
+
+
+def test_global_strong_is_more_uniform_than_local_strong() -> None:
+    processor = ImageProcessor()
+    image = Image.new("RGB", (120, 120), (150, 150, 150))
+    for x in range(40, 80):
+        for y in range(40, 80):
+            image.putpixel((x, y), (175, 175, 175))
+
+    metrics = processor.calculate_metrics(image)
+    local_processed = processor.apply_pipeline(image, metrics, ProcessingPreset.STRONG)
+    global_processed = processor.apply_pipeline(image, metrics, ProcessingPreset.GLOBAL_STRONG)
+
+    original = np.asarray(image, dtype=np.float32)
+    local_enhanced = np.asarray(local_processed, dtype=np.float32)
+    global_enhanced = np.asarray(global_processed, dtype=np.float32)
+
+    local_delta = (
+        local_enhanced[45:75, 45:75].mean() - original[45:75, 45:75].mean()
+    ) - (
+        local_enhanced[:20, :20].mean() - original[:20, :20].mean()
+    )
+    global_delta = (
+        global_enhanced[45:75, 45:75].mean() - original[45:75, 45:75].mean()
+    ) - (
+        global_enhanced[:20, :20].mean() - original[:20, :20].mean()
+    )
+
+    assert abs(local_delta) > abs(global_delta)
