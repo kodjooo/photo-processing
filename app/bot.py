@@ -160,21 +160,23 @@ def _preset_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Local Natural", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.NATURAL}"),
-                InlineKeyboardButton(text="Local Balanced", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.BALANCED}"),
-                InlineKeyboardButton(text="Local Strong", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.STRONG}"),
-            ],
-            [
+                InlineKeyboardButton(text="Лок Мягко", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.NATURAL}"),
                 InlineKeyboardButton(
-                    text="Global Natural",
+                    text="Общ Мягко",
                     callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.GLOBAL_NATURAL}",
                 ),
+            ],
+            [
+                InlineKeyboardButton(text="Лок Баланс", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.BALANCED}"),
                 InlineKeyboardButton(
-                    text="Global Balanced",
+                    text="Общ Баланс",
                     callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.GLOBAL_BALANCED}",
                 ),
+            ],
+            [
+                InlineKeyboardButton(text="Лок Сильно", callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.STRONG}"),
                 InlineKeyboardButton(
-                    text="Global Strong",
+                    text="Общ Сильно",
                     callback_data=f"{PRESET_CALLBACK_PREFIX}{ProcessingPreset.GLOBAL_STRONG}",
                 ),
             ],

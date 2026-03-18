@@ -16,7 +16,7 @@ class Job(Base):
     telegram_chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
     source_url: Mapped[str] = mapped_column(Text)
     preset: Mapped[ProcessingPreset] = mapped_column(
-        Enum(ProcessingPreset, native_enum=False),
+        Enum(ProcessingPreset, native_enum=False, length=32),
         default=ProcessingPreset.DEFAULT,
     )
     status: Mapped[JobStatus] = mapped_column(
