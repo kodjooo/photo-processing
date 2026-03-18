@@ -16,6 +16,7 @@ class NotificationService:
         result_url: str,
         processed_files: int,
         skipped_files: int,
+        debug_archives: list,
     ) -> None:
         text = (
             f"Задача завершена: {job_id}\n"
@@ -23,6 +24,10 @@ class NotificationService:
             f"Пропущено: {skipped_files}\n"
             f"Результат: {result_url}"
         )
+        if debug_archives:
+            lines = [text, "Тестовые архивы декодирования:"]
+            lines.extend(f"- {archive.label}: {archive.public_url}" for archive in debug_archives)
+            text = "\n".join(lines)
         await self.bot.send_message(chat_id=telegram_chat_id, text=text)
 
     async def send_job_failed(

@@ -55,3 +55,14 @@ def test_build_output_path_converts_raw_extension_to_jpg(tmp_path: Path) -> None
 
     assert result_path.name == "photo.jpg"
     assert result_path.parent == output_dir / "nested"
+
+
+def test_prepare_job_paths_contains_debug_decode_locations() -> None:
+    storage = StorageService()
+
+    paths = storage.prepare_job_paths("job-1")
+
+    assert paths.decode_auto_bright_dir.name == "decoded-auto-bright"
+    assert paths.decode_natural_dir.name == "decoded-natural"
+    assert paths.decode_auto_bright_archive_path.name == "decoded-auto-bright.zip"
+    assert paths.decode_natural_archive_path.name == "decoded-natural.zip"

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     api_host: str = Field(alias="API_HOST")
     api_port: int = Field(alias="API_PORT")
     app_timezone: str = Field(alias="APP_TIMEZONE")
+    decode_debug_exports_enabled: bool = Field(alias="DECODE_DEBUG_EXPORTS_ENABLED", default=False)
 
     @property
     def redis_queue_name(self) -> str:
@@ -33,4 +34,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

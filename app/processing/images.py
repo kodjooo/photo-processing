@@ -50,16 +50,34 @@ class ImageProcessor:
         target_path.parent.mkdir(parents=True, exist_ok=True)
         composed.save(target_path, quality=95)
 
-    def load_source_image(self, source_path: Path) -> Image.Image:
+    def export_decoded_image(
+        self,
+        source_path: Path,
+        target_path: Path,
+        *,
+        raw_auto_bright: bool,
+    ) -> None:
+        image = self.load_source_image(source_path, raw_auto_bright=raw_auto_bright)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        image.save(target_path, quality=95)
+
+    def load_source_image(self, source_path: Path, *, raw_auto_bright: bool = True) -> Image.Image:
         if source_path.suffix.lower() in {".cr2", ".arw"}:
-            if rawpy is None:
-                raise RuntimeError("Поддержка RAW недоступна: не установлена библиотека rawpy")
-            with rawpy.imread(str(source_path)) as raw:
-                rgb = raw.postprocess(use_camera_wb=True, no_auto_bright=False, output_bps=8)
-            return Image.fromarray(rgb).convert("RGB")
+            return self._load_raw_image(source_path, auto_bright=raw_auto_bright)
 
         image = Image.open(source_path)
         return ImageOps.exif_transpose(image).convert("RGB")
+
+    def _load_raw_image(self, source_path: Path, *, auto_bright: bool) -> Image.Image:
+        if rawpy is None:
+            raise RuntimeError("Поддержка RAW недоступна: не установлена библиотека rawpy")
+        with rawpy.imread(str(source_path)) as raw:
+            rgb = raw.postprocess(
+                use_camera_wb=True,
+                no_auto_bright=not auto_bright,
+                output_bps=8,
+            )
+        return Image.fromarray(rgb).convert("RGB")
 
     def calculate_metrics(self, image: Image.Image) -> ImageMetrics:
         grayscale = image.convert("L")

@@ -24,6 +24,13 @@ class ProcessedFile:
     reason: str | None = None
 
 
+@dataclass(slots=True)
+class DebugArchive:
+    label: str
+    remote_name: str
+    public_url: str
+
+
 class JobProcessor:
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -89,18 +96,39 @@ class JobProcessor:
                 await repository.set_status(job, JobStatus.PACKAGING, "Упаковка результата")
                 await self._ensure_not_cancelled(repository, job.id)
                 self.storage.package_result(paths.output_dir, paths.result_archive_path)
+                debug_archives: list[DebugArchive] = []
+                if self.settings.decode_debug_exports_enabled:
+                    debug_archives = await self._build_debug_decode_archives(
+                        repository=repository,
+                        job_id=job.id,
+                        source_paths=scan_result.supported_files,
+                        unpacked_dir=paths.unpacked_dir,
+                        paths=paths,
+                    )
 
                 await repository.set_status(job, JobStatus.UPLOADING, "Загрузка результата на Яндекс Диск")
                 await self._ensure_not_cancelled(repository, job.id)
                 result_url = await self.disk.upload_result(paths.result_archive_path, f"{job.id}.zip")
+                for archive in debug_archives:
+                    archive.public_url = await self.disk.upload_result(
+                        paths.result_dir / archive.remote_name,
+                        archive.remote_name,
+                    )
                 await repository.update_counters(job, result_url=result_url)
                 await repository.set_status(job, JobStatus.COMPLETED, "Обработка завершена")
+                for archive in debug_archives:
+                    await repository.add_event(
+                        job_id=job.id,
+                        status=JobStatus.COMPLETED,
+                        message=f"Тестовый архив {archive.label}: {archive.public_url}",
+                    )
                 await self._notify_completed(
                     telegram_chat_id=job.telegram_chat_id,
                     job_id=job.id,
                     result_url=result_url,
                     processed_files=processed_count,
                     skipped_files=skipped_count,
+                    debug_archives=debug_archives,
                 )
             except asyncio.CancelledError:
                 logger.info("Задача %s отменена во время выполнения", job_id)
@@ -128,6 +156,7 @@ class JobProcessor:
         result_url: str,
         processed_files: int,
         skipped_files: int,
+        debug_archives: list[DebugArchive],
     ) -> None:
         try:
             await self.notifications.send_job_completed(
@@ -136,6 +165,7 @@ class JobProcessor:
                 result_url=result_url,
                 processed_files=processed_files,
                 skipped_files=skipped_files,
+                debug_archives=debug_archives,
             )
         except TelegramForbiddenError:
             logger.warning("Не удалось отправить уведомление по задаче %s: чат недоступен для бота", job_id)
@@ -207,6 +237,50 @@ class JobProcessor:
             )
 
         return results
+
+    async def _build_debug_decode_archives(
+        self,
+        *,
+        repository: JobRepository,
+        job_id: str,
+        source_paths: list[Path],
+        unpacked_dir: Path,
+        paths,
+    ) -> list[DebugArchive]:
+        await repository.add_event(
+            job_id=job_id,
+            status=JobStatus.PACKAGING,
+            message="Тестовый режим: подготовка архивов декодирования RAW",
+        )
+        for source_path in source_paths:
+            await asyncio.to_thread(
+                self.images.export_decoded_image,
+                source_path,
+                self.storage.build_output_path(unpacked_dir, paths.decode_auto_bright_dir, source_path),
+                raw_auto_bright=True,
+            )
+            await asyncio.to_thread(
+                self.images.export_decoded_image,
+                source_path,
+                self.storage.build_output_path(unpacked_dir, paths.decode_natural_dir, source_path),
+                raw_auto_bright=False,
+            )
+
+        self.storage.package_result(paths.decode_auto_bright_dir, paths.decode_auto_bright_archive_path)
+        self.storage.package_result(paths.decode_natural_dir, paths.decode_natural_archive_path)
+
+        return [
+            DebugArchive(
+                label="декодирование с автоосветлением",
+                remote_name=f"{job_id}-decoded-auto-bright.zip",
+                public_url="",
+            ),
+            DebugArchive(
+                label="декодирование без автоосветления",
+                remote_name=f"{job_id}-decoded-natural.zip",
+                public_url="",
+            ),
+        ]
 
     async def _process_single_file(
         self,

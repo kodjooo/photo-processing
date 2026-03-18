@@ -14,9 +14,13 @@ class JobPaths:
     input_dir: Path
     unpacked_dir: Path
     output_dir: Path
+    decode_auto_bright_dir: Path
+    decode_natural_dir: Path
     result_dir: Path
     archive_path: Path
     result_archive_path: Path
+    decode_auto_bright_archive_path: Path
+    decode_natural_archive_path: Path
 
 
 @dataclass(slots=True)
@@ -35,19 +39,27 @@ class StorageService:
         input_dir = root / "input"
         unpacked_dir = input_dir / "unpacked"
         output_dir = root / "output"
+        decode_auto_bright_dir = root / "decoded-auto-bright"
+        decode_natural_dir = root / "decoded-natural"
         result_dir = root / "result"
         input_dir.mkdir(parents=True, exist_ok=True)
         unpacked_dir.mkdir(parents=True, exist_ok=True)
         output_dir.mkdir(parents=True, exist_ok=True)
+        decode_auto_bright_dir.mkdir(parents=True, exist_ok=True)
+        decode_natural_dir.mkdir(parents=True, exist_ok=True)
         result_dir.mkdir(parents=True, exist_ok=True)
         return JobPaths(
             root=root,
             input_dir=input_dir,
             unpacked_dir=unpacked_dir,
             output_dir=output_dir,
+            decode_auto_bright_dir=decode_auto_bright_dir,
+            decode_natural_dir=decode_natural_dir,
             result_dir=result_dir,
             archive_path=input_dir / "archive.zip",
             result_archive_path=result_dir / "result.zip",
+            decode_auto_bright_archive_path=result_dir / "decoded-auto-bright.zip",
+            decode_natural_archive_path=result_dir / "decoded-natural.zip",
         )
 
     def unpack_archive(self, archive_path: Path, destination: Path) -> None:

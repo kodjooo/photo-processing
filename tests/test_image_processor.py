@@ -70,6 +70,38 @@ def test_image_processor_supports_raw_input(tmp_path: Path, monkeypatch) -> None
     assert result.size == (300, 200)
 
 
+def test_export_decoded_image_supports_raw_without_postprocessing(tmp_path: Path, monkeypatch) -> None:
+    source_path = tmp_path / "source.cr2"
+    auto_target_path = tmp_path / "decoded-auto.jpg"
+    natural_target_path = tmp_path / "decoded-natural.jpg"
+
+    source_path.write_bytes(b"raw")
+
+    class FakeRaw:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def postprocess(self, **kwargs):
+            value = 170 if not kwargs["no_auto_bright"] else 120
+            return np.full((100, 140, 3), value, dtype=np.uint8)
+
+    monkeypatch.setattr(images_module, "rawpy", SimpleNamespace(imread=lambda _: FakeRaw()))
+
+    processor = ImageProcessor()
+    processor.export_decoded_image(source_path, auto_target_path, raw_auto_bright=True)
+    processor.export_decoded_image(source_path, natural_target_path, raw_auto_bright=False)
+
+    auto_result = np.asarray(Image.open(auto_target_path), dtype=np.float32)
+    natural_result = np.asarray(Image.open(natural_target_path), dtype=np.float32)
+
+    assert auto_target_path.exists()
+    assert natural_target_path.exists()
+    assert auto_result.mean() > natural_result.mean()
+
+
 def test_load_logo_uses_horizontal_ratio_for_landscape(tmp_path: Path) -> None:
     logo_path = tmp_path / "logo.png"
     Image.new("RGBA", (200, 100), (255, 255, 255, 255)).save(logo_path)
