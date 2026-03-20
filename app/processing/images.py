@@ -10,6 +10,7 @@ try:
 except ImportError:  # pragma: no cover
     rawpy = None
 
+from app.config import get_settings
 from app.enums import ProcessingPreset
 
 
@@ -23,6 +24,9 @@ class ImageMetrics:
 
 
 class ImageProcessor:
+    def __init__(self) -> None:
+        self.settings = get_settings()
+
     def load_logo(self, logo_path: str, base_width: int, base_height: int) -> Image.Image:
         path = Path(logo_path)
         if not path.exists():
@@ -294,8 +298,14 @@ class ImageProcessor:
 
     def apply_logos(self, image: Image.Image, left_logo_path: str, right_logo_path: str) -> Image.Image:
         canvas = image.convert("RGBA")
-        left_logo = self._set_opacity(self.load_logo(left_logo_path, canvas.width, canvas.height), 0.55)
-        right_logo = self._set_opacity(self.load_logo(right_logo_path, canvas.width, canvas.height), 0.55)
+        left_logo = self._set_opacity(
+            self.load_logo(left_logo_path, canvas.width, canvas.height),
+            self.settings.logo_opacity,
+        )
+        right_logo = self._set_opacity(
+            self.load_logo(right_logo_path, canvas.width, canvas.height),
+            self.settings.logo_opacity,
+        )
         padding = max(16, int(canvas.width * 0.02))
         canvas.alpha_composite(left_logo, (padding, max(0, canvas.height - left_logo.height - padding)))
         canvas.alpha_composite(

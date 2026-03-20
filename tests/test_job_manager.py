@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app.enums import JobStatus, ProcessingPreset
@@ -13,7 +14,7 @@ def test_job_response_contains_telegram_chat_id() -> None:
         source_url="https://disk.yandex.ru/d/example",
         preset=ProcessingPreset.BALANCED,
         status=JobStatus.QUEUED,
-        created_at=None,
+        created_at=datetime.now(timezone.utc),
         started_at=None,
         finished_at=None,
         total_files=0,

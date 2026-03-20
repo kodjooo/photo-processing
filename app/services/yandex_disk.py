@@ -1,10 +1,13 @@
 from pathlib import Path
 from urllib.parse import quote
 import asyncio
+import logging
 
 import httpx
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class YandexDiskService:
@@ -12,7 +15,10 @@ class YandexDiskService:
         self.settings = get_settings()
         self.api_base_url = "https://cloud-api.yandex.net/v1/disk"
         self.control_timeout = httpx.Timeout(120.0, connect=30.0)
-        self.upload_timeout = httpx.Timeout(900.0, connect=30.0)
+        self.upload_timeout = httpx.Timeout(
+            self.settings.yandex_upload_timeout_seconds,
+            connect=30.0,
+        )
 
     async def get_public_resource_info(self, public_url: str) -> dict:
         async with httpx.AsyncClient(timeout=self.control_timeout) as client:
@@ -49,20 +55,12 @@ class YandexDiskService:
         headers = {"Authorization": f"OAuth {self.settings.yandex_disk_oauth_token}"}
         async with httpx.AsyncClient(timeout=self.control_timeout) as client:
             await self._ensure_directory_exists(client, self.settings.yandex_disk_base_path, headers)
-            upload_response = await client.get(
-                f"{self.api_base_url}/resources/upload",
-                params={"path": remote_path, "overwrite": "true"},
+            await self._upload_with_retries(
+                client=client,
                 headers=headers,
+                remote_path=remote_path,
+                local_path=local_path,
             )
-            upload_response.raise_for_status()
-            upload_url = upload_response.json().get("href")
-            if not upload_url:
-                raise ValueError("Не удалось получить URL для загрузки результата")
-
-            file_content = await asyncio.to_thread(local_path.read_bytes)
-            async with httpx.AsyncClient(timeout=self.upload_timeout) as upload_client:
-                put_response = await upload_client.put(upload_url, content=file_content)
-                put_response.raise_for_status()
 
             await client.put(
                 f"{self.api_base_url}/resources/publish",
@@ -82,6 +80,68 @@ class YandexDiskService:
                 encoded_path = quote(remote_path)
                 return f"https://disk.yandex.ru/client/disk/{encoded_path}"
             return public_url
+
+    async def _upload_with_retries(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        headers: dict[str, str],
+        remote_path: str,
+        local_path: Path,
+    ) -> None:
+        max_attempts = max(1, self.settings.yandex_upload_max_attempts)
+        last_error: Exception | None = None
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                upload_response = await client.get(
+                    f"{self.api_base_url}/resources/upload",
+                    params={"path": remote_path, "overwrite": "true"},
+                    headers=headers,
+                )
+                upload_response.raise_for_status()
+                upload_url = upload_response.json().get("href")
+                if not upload_url:
+                    raise ValueError("Не удалось получить URL для загрузки результата")
+
+                async with httpx.AsyncClient(timeout=self.upload_timeout) as upload_client:
+                    put_response = await upload_client.put(
+                        upload_url,
+                        content=self._iter_file_chunks(local_path),
+                    )
+                    put_response.raise_for_status()
+                return
+            except (
+                httpx.ReadError,
+                httpx.WriteError,
+                httpx.ReadTimeout,
+                httpx.WriteTimeout,
+                httpx.ConnectError,
+                httpx.RemoteProtocolError,
+            ) as error:
+                last_error = error
+                if attempt >= max_attempts:
+                    break
+                logger.warning(
+                    "Сетевая ошибка при загрузке %s в Яндекс Диск, попытка %s/%s: %s (%s)",
+                    remote_path,
+                    attempt,
+                    max_attempts,
+                    type(error).__name__,
+                    str(error) or "без текста",
+                )
+                await asyncio.sleep(self.settings.yandex_upload_retry_delay_seconds)
+
+        if last_error is not None:
+            raise last_error
+
+    async def _iter_file_chunks(self, local_path: Path):
+        with local_path.open("rb") as file:
+            while True:
+                chunk = await asyncio.to_thread(file.read, self.settings.yandex_upload_chunk_size)
+                if not chunk:
+                    break
+                yield chunk
 
     async def _ensure_directory_exists(
         self,

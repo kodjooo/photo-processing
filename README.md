@@ -12,7 +12,12 @@
 
 ## Запуск
 
-Проект запускается только через Docker Desktop.
+Проект поддерживает два режима запуска, которые переключаются через `APP_RUNTIME_MODE` в `.env`:
+
+- `docker` — приложение и инфраструктура работают в контейнерах;
+- `local` — `api`, `bot` и `worker` запускаются из локального Python-окружения.
+
+### Docker-режим
 
 ```bash
 cp .env.example .env
@@ -26,6 +31,34 @@ docker compose up --build
 - `postgres` — хранение задач и отчетов
 - `redis` — очередь задач
 
+### Local-режим
+
+В `.env` нужно установить:
+
+```env
+APP_RUNTIME_MODE=local
+```
+
+Локальный режим использует значения `LOCAL_DATABASE_URL`, `LOCAL_REDIS_URL`, `LOCAL_JOB_STORAGE_ROOT`, `LOCAL_LEFT_LOGO_PATH`, `LOCAL_RIGHT_LOGO_PATH`.
+
+Если PostgreSQL и Redis вы хотите оставить в Docker, можно поднять только инфраструктуру:
+
+```bash
+docker compose up -d postgres redis
+```
+
+После этого запускать приложение локально:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m app.main init-db
+python -m app.main api
+python -m app.main bot
+python -m app.main worker
+```
+
 ## Полезные команды
 
 ```bash
@@ -37,13 +70,23 @@ docker compose run --rm migrate
 docker compose run --rm api pytest
 ```
 
+Для локального режима:
+
+```bash
+source .venv/bin/activate
+python -m pytest -q
+```
+
 ## Переменные окружения
 
 Обязательно заполните в `.env`:
 - `BOT_TOKEN`
 - `YANDEX_DISK_OAUTH_TOKEN`
 - `YANDEX_DISK_BASE_PATH`
-- пути к логотипам `LEFT_LOGO_PATH` и `RIGHT_LOGO_PATH`, если используются не стандартные файлы внутри контейнера
+- `APP_RUNTIME_MODE`
+- значения `DOCKER_*` и `LOCAL_*` для нужного режима
+- `YANDEX_UPLOAD_CHUNK_SIZE` и `YANDEX_UPLOAD_TIMEOUT_SECONDS`, если для больших архивов нужно увеличить размер чанка или длительность одной попытки загрузки
+- при необходимости override-переменные `DATABASE_URL`, `REDIS_URL`, `JOB_STORAGE_ROOT`, `LEFT_LOGO_PATH`, `RIGHT_LOGO_PATH`
 
 ## Развертывание на удаленном сервере из Git
 
