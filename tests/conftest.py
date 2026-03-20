@@ -6,6 +6,10 @@ def set_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path):
     monkeypatch.setenv("BOT_TOKEN", "token")
     monkeypatch.setenv("YANDEX_DISK_OAUTH_TOKEN", "token")
     monkeypatch.setenv("YANDEX_DISK_BASE_PATH", "/tmp")
+    monkeypatch.setenv("ARCHIVE_SOURCE_MODE", "yandex")
+    monkeypatch.setenv("ARCHIVE_DESTINATION_MODE", "yandex")
+    monkeypatch.setenv("LOCAL_ARCHIVE_SOURCE_PATH", str(tmp_path / "local-archives" / "input" / "archive.zip"))
+    monkeypatch.setenv("LOCAL_ARCHIVE_RESULT_DIR", str(tmp_path / "local-archives" / "output"))
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost:5432/db")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("JOB_STORAGE_ROOT", str(tmp_path / "jobs"))
@@ -26,4 +30,3 @@ def set_test_env(monkeypatch: pytest.MonkeyPatch, tmp_path):
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
-

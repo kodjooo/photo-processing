@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.enums import JobStatus
 from app.repositories.jobs import JobRepository
 from app.schemas import JobResponse
@@ -9,21 +10,38 @@ from app.services.validators import validate_yandex_public_url
 
 class JobManager:
     def __init__(self, session: AsyncSession):
+        self.settings = get_settings()
         self.repository = JobRepository(session)
         self.queue = QueueService()
 
-    async def create_job(self, telegram_user_id: int, telegram_chat_id: int, source_url: str, preset: str) -> JobResponse:
-        validate_yandex_public_url(source_url)
+    async def create_job(
+        self,
+        telegram_user_id: int,
+        telegram_chat_id: int,
+        source_url: str | None,
+        preset: str,
+    ) -> JobResponse:
+        source_reference = self._resolve_source_reference(source_url)
         job = await self.repository.create_job(
             telegram_user_id=telegram_user_id,
             telegram_chat_id=telegram_chat_id,
-            source_url=source_url,
+            source_url=source_reference,
             preset=preset,
         )
         job = await self.repository.set_status(job, JobStatus.VALIDATING, "Ссылка принята в обработку")
         job = await self.repository.set_status(job, JobStatus.QUEUED, "Задача поставлена в очередь")
         await self.queue.enqueue(job.id)
         return self._to_response(job)
+
+    def _resolve_source_reference(self, source_url: str | None) -> str:
+        if self.settings.archive_source_mode == "local":
+            return self.settings.local_archive_source_path
+
+        normalized_source = (source_url or "").strip()
+        if not normalized_source:
+            raise ValueError("Нужна публичная ссылка Яндекс Диска")
+        validate_yandex_public_url(normalized_source)
+        return normalized_source
 
     async def get_job(self, job_id: str) -> JobResponse | None:
         job = await self.repository.get_job(job_id)

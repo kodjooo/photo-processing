@@ -17,6 +17,13 @@
 - `docker` — приложение и инфраструктура работают в контейнерах;
 - `local` — `api`, `bot` и `worker` запускаются из локального Python-окружения.
 
+Источник и приемник архивов тоже переключаются через `.env`:
+
+- `ARCHIVE_SOURCE_MODE=yandex|local`
+- `ARCHIVE_DESTINATION_MODE=yandex|local`
+
+Если выбрать `local`, сервис берет исходный ZIP из `LOCAL_ARCHIVE_SOURCE_PATH` и/или сохраняет результат в `LOCAL_ARCHIVE_RESULT_DIR`.
+
 ### Docker-режим
 
 ```bash
@@ -30,6 +37,8 @@ docker compose up --build
 - `worker` — обработчик задач
 - `postgres` — хранение задач и отчетов
 - `redis` — очередь задач
+
+Для локальных архивов в Docker автоматически монтируется папка проекта `./local-archives` в контейнеры как `/app/local-archives`.
 
 ### Local-режим
 
@@ -84,9 +93,25 @@ python -m pytest -q
 - `YANDEX_DISK_OAUTH_TOKEN`
 - `YANDEX_DISK_BASE_PATH`
 - `APP_RUNTIME_MODE`
+- `ARCHIVE_SOURCE_MODE` и `ARCHIVE_DESTINATION_MODE`
+- `LOCAL_ARCHIVE_SOURCE_PATH`, если входной ZIP нужно брать из папки проекта
+- `LOCAL_ARCHIVE_RESULT_DIR`, если результат нужно складывать в папку проекта
 - значения `DOCKER_*` и `LOCAL_*` для нужного режима
 - `YANDEX_UPLOAD_CHUNK_SIZE` и `YANDEX_UPLOAD_TIMEOUT_SECONDS`, если для больших архивов нужно увеличить размер чанка или длительность одной попытки загрузки
 - при необходимости override-переменные `DATABASE_URL`, `REDIS_URL`, `JOB_STORAGE_ROOT`, `LEFT_LOGO_PATH`, `RIGHT_LOGO_PATH`
+
+Пример локального сценария через папку проекта:
+
+```env
+ARCHIVE_SOURCE_MODE=local
+ARCHIVE_DESTINATION_MODE=local
+LOCAL_ARCHIVE_SOURCE_PATH=local-archives/input/archive.zip
+LOCAL_ARCHIVE_RESULT_DIR=local-archives/output
+```
+
+После этого:
+- положите исходный ZIP в `local-archives/input/archive.zip`
+- готовый результат появится в `local-archives/output/`
 
 ## Развертывание на удаленном сервере из Git
 

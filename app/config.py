@@ -10,6 +10,16 @@ class Settings(BaseSettings):
     bot_token: str = Field(alias="BOT_TOKEN")
     yandex_disk_oauth_token: str = Field(alias="YANDEX_DISK_OAUTH_TOKEN")
     yandex_disk_base_path: str = Field(alias="YANDEX_DISK_BASE_PATH")
+    archive_source_mode: str = Field(alias="ARCHIVE_SOURCE_MODE", default="yandex")
+    archive_destination_mode: str = Field(alias="ARCHIVE_DESTINATION_MODE", default="yandex")
+    local_archive_source_path: str = Field(
+        alias="LOCAL_ARCHIVE_SOURCE_PATH",
+        default="local-archives/input/archive.zip",
+    )
+    local_archive_result_dir: str = Field(
+        alias="LOCAL_ARCHIVE_RESULT_DIR",
+        default="local-archives/output",
+    )
 
     runtime_mode: str = Field(alias="APP_RUNTIME_MODE", default="docker")
 

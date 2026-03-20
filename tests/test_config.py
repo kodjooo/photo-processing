@@ -10,6 +10,10 @@ def test_settings_use_local_runtime_values(monkeypatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "token")
     monkeypatch.setenv("YANDEX_DISK_OAUTH_TOKEN", "disk")
     monkeypatch.setenv("YANDEX_DISK_BASE_PATH", "/results")
+    monkeypatch.setenv("ARCHIVE_SOURCE_MODE", "local")
+    monkeypatch.setenv("ARCHIVE_DESTINATION_MODE", "local")
+    monkeypatch.setenv("LOCAL_ARCHIVE_SOURCE_PATH", "local-archives/input/archive.zip")
+    monkeypatch.setenv("LOCAL_ARCHIVE_RESULT_DIR", "local-archives/output")
     monkeypatch.setenv("APP_RUNTIME_MODE", "local")
     monkeypatch.setenv("DOCKER_DATABASE_URL", "postgresql+asyncpg://docker")
     monkeypatch.setenv("LOCAL_DATABASE_URL", "postgresql+asyncpg://local")
@@ -40,6 +44,10 @@ def test_settings_use_local_runtime_values(monkeypatch) -> None:
     assert settings.database_url == "postgresql+asyncpg://local"
     assert settings.redis_url == "redis://local"
     assert settings.job_storage_root == "tmp/local-jobs"
+    assert settings.archive_source_mode == "local"
+    assert settings.archive_destination_mode == "local"
+    assert settings.local_archive_source_path == "local-archives/input/archive.zip"
+    assert settings.local_archive_result_dir == "local-archives/output"
     assert settings.left_logo_path == "app/assets/local-left.png"
     assert settings.right_logo_path == "app/assets/local-right.png"
     assert settings.logo_opacity == 0.42
@@ -52,6 +60,10 @@ def test_settings_use_override_values_first(monkeypatch) -> None:
     monkeypatch.setenv("BOT_TOKEN", "token")
     monkeypatch.setenv("YANDEX_DISK_OAUTH_TOKEN", "disk")
     monkeypatch.setenv("YANDEX_DISK_BASE_PATH", "/results")
+    monkeypatch.setenv("ARCHIVE_SOURCE_MODE", "yandex")
+    monkeypatch.setenv("ARCHIVE_DESTINATION_MODE", "local")
+    monkeypatch.setenv("LOCAL_ARCHIVE_SOURCE_PATH", "local-archives/input/archive.zip")
+    monkeypatch.setenv("LOCAL_ARCHIVE_RESULT_DIR", "local-archives/output")
     monkeypatch.setenv("APP_RUNTIME_MODE", "docker")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://override")
     monkeypatch.setenv("REDIS_URL", "redis://override")
@@ -87,6 +99,8 @@ def test_settings_use_override_values_first(monkeypatch) -> None:
     assert settings.database_url == "postgresql+asyncpg://override"
     assert settings.redis_url == "redis://override"
     assert settings.job_storage_root == "/override/jobs"
+    assert settings.archive_source_mode == "yandex"
+    assert settings.archive_destination_mode == "local"
     assert settings.left_logo_path == "/override/left.png"
     assert settings.right_logo_path == "/override/right.png"
     assert settings.logo_opacity == 0.61

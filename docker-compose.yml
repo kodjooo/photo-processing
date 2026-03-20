@@ -36,6 +36,7 @@ services:
         condition: service_healthy
     volumes:
       - job_storage:/tmp/jobs
+      - ./local-archives:/app/local-archives
 
   api:
     build: .
@@ -54,6 +55,7 @@ services:
       retries: 20
     volumes:
       - job_storage:/tmp/jobs
+      - ./local-archives:/app/local-archives
 
   bot:
     build: .
@@ -65,6 +67,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - job_storage:/tmp/jobs
+      - ./local-archives:/app/local-archives
 
   worker:
     build: .
@@ -76,6 +79,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - job_storage:/tmp/jobs
+      - ./local-archives:/app/local-archives
 
 volumes:
   postgres_data:

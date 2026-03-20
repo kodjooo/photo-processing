@@ -17,6 +17,19 @@ PENDING_LINKS: dict[int, str] = {}
 
 
 def _help_text() -> str:
+    settings = get_settings()
+    if settings.archive_source_mode == "local":
+        return (
+            "Сервис берет исходный ZIP из папки проекта.\n"
+            f"Текущий путь: {settings.local_archive_source_path}\n"
+            "Используйте:\n"
+            "/process [preset]\n"
+            "/status <job_id>\n"
+            "/cancel <job_id>\n"
+            "/last\n"
+            "/presets\n"
+            "/logo"
+        )
     return (
         "Отправьте публичную ссылку Яндекс Диска на ZIP-архив или используйте:\n"
         "/process <ссылка> [preset]\n"
@@ -35,6 +48,10 @@ async def _with_manager(callback):
 
 
 async def cmd_start(message: Message) -> None:
+    settings = get_settings()
+    if settings.archive_source_mode == "local":
+        await message.answer("Сервис работает с ZIP-архивом из папки проекта.\n" + _help_text())
+        return
     await message.answer("Сервис принимает ZIP-архивы с Яндекс Диска.\n" + _help_text())
 
 
@@ -62,6 +79,20 @@ async def cmd_logo(message: Message) -> None:
 
 
 async def cmd_process(message: Message, command: CommandObject) -> None:
+    settings = get_settings()
+    if settings.archive_source_mode == "local":
+        source_url = settings.local_archive_source_path
+        if command.args is None:
+            await _ask_for_preset(message, source_url)
+            return
+        try:
+            preset = ProcessingPreset(command.args.strip().lower())
+        except ValueError:
+            await message.answer("В локальном режиме используйте /process [preset]. Доступные режимы: /presets")
+            return
+        await _process_url(message, source_url, preset)
+        return
+
     if command.args is None:
         await message.answer("Нужна ссылка: /process <ссылка> [preset]")
         return
@@ -120,6 +151,8 @@ async def cmd_last(message: Message) -> None:
 
 
 async def on_url_message(message: Message) -> None:
+    if get_settings().archive_source_mode == "local":
+        return
     text = (message.text or "").strip()
     await _ask_for_preset(message, text)
 

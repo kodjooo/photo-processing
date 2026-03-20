@@ -19,3 +19,7 @@ logs/
 .DS_Store
 postgres_data/
 redis_data/
+local-archives/input/*
+!local-archives/input/.gitkeep
+local-archives/output/*
+!local-archives/output/.gitkeep

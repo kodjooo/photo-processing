@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 from app.enums import FileStatus, JobStatus, ProcessingPreset
 
@@ -8,7 +8,7 @@ from app.enums import FileStatus, JobStatus, ProcessingPreset
 class CreateJobRequest(BaseModel):
     telegram_user_id: int
     telegram_chat_id: int | None = None
-    source_url: HttpUrl
+    source_url: str | None = None
     preset: ProcessingPreset = ProcessingPreset.DEFAULT
 
 

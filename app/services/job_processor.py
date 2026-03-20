@@ -11,6 +11,7 @@ from app.enums import FileStatus, JobStatus
 from app.processing.images import ImageProcessor
 from app.repositories.jobs import JobRepository
 from app.services.notifications import NotificationService
+from app.services.local_archive import LocalArchiveService
 from app.services.storage import StorageService
 from app.services.yandex_disk import YandexDiskService
 
@@ -37,6 +38,7 @@ class JobProcessor:
         self.settings = get_settings()
         self.storage = StorageService()
         self.disk = YandexDiskService()
+        self.local_archives = LocalArchiveService()
         self.images = ImageProcessor()
         self.notifications = NotificationService()
 
@@ -54,7 +56,7 @@ class JobProcessor:
             paths = self.storage.prepare_job_paths(job_id)
             processed_entries: list[ProcessedFile] = []
             try:
-                await repository.set_status(job, JobStatus.DOWNLOADING, "Скачивание архива")
+                await repository.set_status(job, JobStatus.DOWNLOADING, self._download_status_message())
                 await self._ensure_not_cancelled(repository, job.id)
                 await self._download_archive(job.source_url, paths.archive_path)
                 self._validate_archive_size(paths.archive_path)
@@ -107,11 +109,11 @@ class JobProcessor:
                         paths=paths,
                     )
 
-                await repository.set_status(job, JobStatus.UPLOADING, "Загрузка результата на Яндекс Диск")
+                await repository.set_status(job, JobStatus.UPLOADING, self._upload_status_message())
                 await self._ensure_not_cancelled(repository, job.id)
-                result_url = await self.disk.upload_result(paths.result_archive_path, f"{job.id}.zip")
+                result_url = await self._store_result(paths.result_archive_path, f"{job.id}.zip")
                 for archive in debug_archives:
-                    archive.public_url = await self.disk.upload_result(
+                    archive.public_url = await self._store_result(
                         archive.local_path,
                         archive.remote_name,
                     )
@@ -192,6 +194,10 @@ class JobProcessor:
             logger.exception("Ошибка Telegram API при отправке ошибки по задаче %s", job_id)
 
     async def _download_archive(self, source_url: str, target_path: Path) -> None:
+        if self.settings.archive_source_mode == "local":
+            await self.local_archives.copy_source_archive(target_path)
+            return
+
         resource_info = await self.disk.get_public_resource_info(source_url)
         if resource_info.get("type") != "file":
             raise ValueError("По ссылке должен быть доступен файл")
@@ -203,10 +209,25 @@ class JobProcessor:
         download_url = await self.disk.get_public_download_url(source_url)
         await self.disk.stream_download_to_file(download_url, target_path)
 
+    async def _store_result(self, local_path: Path, target_name: str) -> str:
+        if self.settings.archive_destination_mode == "local":
+            return await self.local_archives.store_result(local_path, target_name)
+        return await self.disk.upload_result(local_path, target_name)
+
     def _validate_archive_size(self, archive_path: Path) -> None:
         size = archive_path.stat().st_size
         if size > self.settings.max_archive_size_bytes:
             raise ValueError("Размер скачанного архива превышает лимит 5 ГБ")
+
+    def _download_status_message(self) -> str:
+        if self.settings.archive_source_mode == "local":
+            return "Копирование архива из папки проекта"
+        return "Скачивание архива"
+
+    def _upload_status_message(self) -> str:
+        if self.settings.archive_destination_mode == "local":
+            return "Сохранение результата в папку проекта"
+        return "Загрузка результата на Яндекс Диск"
 
     async def _process_images(
         self,
